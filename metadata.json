@@ -1,0 +1,6 @@
+{
+  "name": "Marges IQ",
+  "description": "Système de décision de soumission et de prix de revient complet pour entreprises de services terrain, avec estimation analytique des charges directes, logistiques et administratives.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

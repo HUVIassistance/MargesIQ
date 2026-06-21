@@ -9,6 +9,7 @@ import HomeDashboard from "./components/HomeDashboard";
 import ProjectForm from "./components/ProjectForm";
 import ResultScreen from "./components/ResultScreen";
 import PrintPDF from "./components/PrintPDF";
+import HuviLogo from "./components/HuviLogo";
 
 // 3 Pre-populated realistic Field Service mock simulations as a professional SaaS starting state
 const DEFAULT_SIMULATIONS: SimulationState[] = [
@@ -332,9 +333,14 @@ export default function App() {
             </span>
           </div>
 
-          <div className="text-xs text-slate-500 font-mono flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            STABLE v1.0.0
+          <div className="flex items-center gap-4">
+            <div className="text-xs text-slate-500 font-mono hidden sm:flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              STABLE v1.0.0
+            </div>
+            <div className="border-l border-slate-800/80 pl-4 h-9 flex items-center md:scale-100 scale-90 origin-right">
+              <HuviLogo size="md" />
+            </div>
           </div>
         </div>
       </header>

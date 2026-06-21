@@ -6,6 +6,7 @@
 import React from "react";
 import { Zap, Settings, Calculator, BarChart3 } from "lucide-react";
 import { SimulationState, ModeType } from "../types";
+import HuviLogo from "./HuviLogo";
 
 interface HomeDashboardProps {
   pastSimulations: SimulationState[];
@@ -25,10 +26,18 @@ export default function HomeDashboard({
           <Calculator size={11} className="text-orange-500" />
           Moteur de décision
         </div>
-        <h1 className="text-5xl md:text-6xl lg:text-7xl font-black tracking-tight text-white leading-none">
-          Marges <span className="text-orange-500">IQ</span>
-        </h1>
-        <p className="text-xs md:text-sm text-slate-400 max-w-sm mx-auto leading-relaxed">
+        <div className="flex flex-col items-center justify-center">
+          <div className="relative inline-block pb-5" id="home_title_wrapper">
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-black tracking-tight text-white leading-none">
+              Marges <span className="text-orange-500">IQ</span>
+            </h1>
+            <div className="absolute -bottom-1 right-0 bg-slate-950/90 border border-slate-800/60 px-1.5 py-0.5 rounded-full text-slate-300 shadow-lg backdrop-blur-sm flex items-center gap-1 select-none" id="brand_badge">
+              <span className="text-[7.5px] text-slate-500 font-bold uppercase tracking-widest pl-0.5">par</span>
+              <HuviLogo showText={true} size="xs" layout="horizontal" />
+            </div>
+          </div>
+        </div>
+        <p className="text-xs md:text-sm text-slate-400 max-w-sm mx-auto leading-relaxed pt-1">
           Ce n'est pas un estimateur. C'est un moteur de précalcul et de décision économique pour services terrain.
         </p>
       </div>

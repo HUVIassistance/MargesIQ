@@ -10,14 +10,9 @@ import {
   CheckCircle,
   XCircle,
   Download,
-  Info,
-  Award,
-  Cpu,
   Shield,
   Star,
   SlidersHorizontal,
-  Plus,
-  Trash2,
   Printer
 } from "lucide-react";
 import { SimulationState, SimulationResult } from "../types";
@@ -93,8 +88,6 @@ export default function ResultScreen({
 }: ResultScreenProps) {
   const [customPriceVal, setCustomPriceVal] = useState<number>(0);
   const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState<boolean>(false);
-  const [aiInsight, setAiInsight] = useState<string>("");
-  const [loadingAi, setLoadingAi] = useState<boolean>(false);
   const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
 
   // Post-Project Actuals State
@@ -125,80 +118,6 @@ export default function ResultScreen({
   }, [simulation, customPriceVal]);
 
   const simulatedResult = useMemo(() => calculateSimulation(simulatedState), [simulatedState]);
-
-  // Fetch AI Insight per simulation price adjustment with debouncing
-  useEffect(() => {
-    let active = true;
-    let timer: NodeJS.Timeout;
-
-    const fetchAiInsight = async () => {
-      setLoadingAi(true);
-      try {
-        const bodyPayload = {
-          projectName: simulation.projectName,
-          tradeType: simulation.measurement.tradeType,
-          operationalProfile: simulation.measurement.operationalProfile,
-          objective: simulation.measurement.objective,
-          complexity: simulation.measurement.complexity,
-          quantity: simulation.measurement.quantity,
-          unit: simulation.measurement.unit,
-          totalCosts: simulatedResult.cr.total,
-          laborCost: simulatedResult.cr.labor,
-          materialCost: simulatedResult.cr.materials,
-          travelCost: simulatedResult.cr.travel,
-          cacCost: simulatedResult.cr.cac,
-          overheadCost: simulatedResult.cr.overhead,
-          bufferPercent: simulation.resilience.bufferPercent,
-          recommendedPrice: simulatedResult.prices.recommended,
-          minimumPrice: simulatedResult.prices.minimumViable,
-          margeType: simulation.margin.type,
-          margeCible: simulation.margin.targetValue,
-          margeReellePercent: simulatedResult.margins.realPercent,
-          strategicScore: simulatedResult.strategicScore,
-          ratioCR_CC: simulatedResult.r,
-          decisionStatus: simulatedResult.decisionStatus
-        };
-
-        const res = await fetch("/api/gemini/insight", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(bodyPayload)
-        });
-
-        if (!res.ok) {
-          throw new Error("API Route did not return success");
-        }
-
-        const data = await res.json();
-        if (active) {
-          setAiInsight(data.insight);
-        }
-      } catch (err) {
-        console.error("Failed to load Gemini decision helper:", err);
-        if (active) {
-          setAiInsight(
-            "Analyse locale : La structure de coût est bien protégée et amortit de manière résiliente les écarts d'imprévus."
-          );
-        }
-      } finally {
-        if (active) {
-          setLoadingAi(false);
-        }
-      }
-    };
-
-    // Debounce to 1000ms to throttle API calls during rapid price/value slider adjustments
-    timer = setTimeout(() => {
-      fetchAiInsight();
-    }, 1000);
-
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [simulation, customPriceVal, simulatedResult]);
 
   const handleSaveActuals = () => {
     const updatedSim: SimulationState = {
@@ -305,31 +224,6 @@ export default function ResultScreen({
           {/* RIGHT 4-COLS PANELS */}
           <div className="lg:col-span-4 space-y-6">
             
-            {/* Gemini AI Decision Assistant insight block */}
-            <div className="bg-[#1a2034] border border-[#2b354e] rounded-3xl p-6 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-full blur-2xl" />
-              <div className="flex items-center gap-2 mb-4">
-                <Cpu className="text-orange-400" size={18} />
-                <span className="text-[11px] font-black tracking-widest uppercase font-mono text-orange-400">
-                  Insight Marges IQ
-                </span>
-              </div>
-
-              {loadingAi ? (
-                <div className="space-y-3 py-2">
-                  <div className="h-3.5 bg-slate-800 rounded animate-pulse w-full" />
-                  <div className="h-3.5 bg-slate-800 rounded animate-pulse w-5/6" />
-                </div>
-              ) : (
-                <div className="text-slate-100 text-xs md:text-sm leading-relaxed font-semibold italic">
-                  "{aiInsight}"
-                </div>
-              )}
-              <div className="text-[9px] text-slate-500 mt-4 border-t border-slate-800/80 pt-3 flex items-center gap-1">
-                <Info size={11} /> Généré par le modèle d'optimisation Gemini 3.5.
-              </div>
-            </div>
-
             {/* Detailed Strategic Level Score Block */}
             <div className="bg-slate-900/60 border border-slate-800/80 p-5 rounded-3xl">
               <span className="text-[10px] uppercase font-black tracking-wider text-slate-500 block mb-1">
@@ -455,7 +349,7 @@ export default function ResultScreen({
 
                     {savedSuccess && (
                       <div className="text-[10px] text-green-400 text-center font-bold font-mono animate-fade-in">
-                        Données réelles sauvegardées avec succès !
+                        Sauvegardé sur cet appareil
                       </div>
                     )}
                   </div>

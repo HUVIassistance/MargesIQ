@@ -1,9 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   /* Palette HUVI — accent orange #F47B20 (harmonisation de la marque) */
   --color-orange-50: #FFF4E9;
@@ -17,9 +16,9 @@
 }
 
 @layer base {
-  /* Replace digital typewriter look with premium, elegant tabular system font */
+  /* KPI et chiffres : JetBrains Mono + chiffres tabulaires (alignement colonnes) */
   .font-mono {
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+    font-family: var(--font-mono) !important;
     font-variant-numeric: tabular-nums !important;
   }
 }

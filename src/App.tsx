@@ -294,14 +294,15 @@ export default function App() {
   const [pastSimulations, setPastSimulations] = useState<SimulationState[]>(loadSimulations);
   const [viewState, setViewState] = useState<"dashboard" | "form" | "result">(() => {
     if (getInitialMode()) return "form";
-    if (loadDraft()) return "form";
+    // En embed, ne jamais restaurer le brouillon : l'embed doit être neutre.
+    if (!isEmbedMode() && loadDraft()) return "form";
     return "dashboard";
   });
   const [selectedSimId, setSelectedSimId] = useState<string | null>(null);
   const [editingState, setEditingState] = useState<SimulationState | null>(() => {
     const mode = getInitialMode();
     if (mode) return createInitialSimulation(mode);
-    return loadDraft();
+    return isEmbedMode() ? null : loadDraft();
   });
 
   // Persistance réelle en localStorage (préfixe marges-iq:)

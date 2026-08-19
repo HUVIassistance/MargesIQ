@@ -34,6 +34,7 @@ interface ProjectFormProps {
   initialState: SimulationState;
   onSave: (state: SimulationState) => void;
   onCancel: () => void;
+  onDraftChange?: (state: SimulationState) => void;
 }
 
 const ROLE_OPTIONS = [
@@ -58,8 +59,15 @@ const STRATEGIC_CRITERIA = [
   { key: "operationalAlignment" as const, label: "Alignement opérationnel", desc: "Compétences d'équipe disponibles et intérêt technique" },
 ];
 
-export default function ProjectForm({ initialState, onSave, onCancel }: ProjectFormProps) {
+export default function ProjectForm({ initialState, onSave, onCancel, onDraftChange }: ProjectFormProps) {
   const [state, setState] = useState<SimulationState>(initialState);
+
+  // Persistance du brouillon (débouncée) pour restauration au retour
+  useEffect(() => {
+    if (!onDraftChange) return;
+    const timer = setTimeout(() => onDraftChange(state), 600);
+    return () => clearTimeout(timer);
+  }, [state, onDraftChange]);
   
   // Decide how many steps dynamically based on selected mode to match requested sequence exactly
   const stepsList = React.useMemo(() => {

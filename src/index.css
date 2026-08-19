@@ -4,6 +4,16 @@
 @theme {
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* Palette HUVI — accent orange #F47B20 (harmonisation de la marque) */
+  --color-orange-50: #FFF4E9;
+  --color-orange-300: #F8A45C;
+  --color-orange-400: #F58B2D;
+  --color-orange-500: #F47B20;
+  --color-orange-600: #CE5C0B;
+  --color-orange-700: #AA4B08;
+  --color-orange-850: #773406;
+  --color-orange-950: #311503;
 }
 
 @layer base {

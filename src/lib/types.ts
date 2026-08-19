@@ -142,8 +142,6 @@ export interface CalculationResult {
   costProduction: number;
   // Profit
   profitNet: number;
-  // Insight
-  insight: string;
 }
 
 export const TRADE_LABELS: Record<TradeType, string> = {

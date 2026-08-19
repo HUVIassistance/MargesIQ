@@ -168,9 +168,6 @@ export function calculate(input: SubmissionInput): CalculationResult {
   const marginGap = marginReal - marginRequested;
   const profitNet = priceForRealMargin - costTotal;
 
-  // Insight
-  const insight = generateInsight(input, costTotal, priceRecommended, ratio, status, profile);
-
   return {
     status,
     ratio,
@@ -196,50 +193,9 @@ export function calculate(input: SubmissionInput): CalculationResult {
     costBuffer: round2(costBuffer),
     costProduction: round2(costProduction),
     profitNet: round2(profitNet),
-    insight,
   };
 }
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
-}
-
-function generateInsight(
-  input: SubmissionInput,
-  cr: number,
-  price: number,
-  ratio: number,
-  status: DecisionStatus,
-  profile: string
-): string {
-  if (status === 'NON_RENTABLE') {
-    const biggest = getBiggestCost(input);
-    return `Projet non rentable — le poste "${biggest}" représente la charge la plus élevée, envisagez une renégociation.`;
-  }
-  if (status === 'RENEGOCIER') {
-    return `Marge too serrée (ratio ${ratio.toFixed(2)}) — négociez le prix ou réduisez le scope pour atteindre la rentabilité.`;
-  }
-  if (status === 'STRATEGIQUE') {
-    return `Projet déficitaire mais score stratégique élevé — acceptation recommandée pour valeur long terme.`;
-  }
-  if (status === 'OK_FRAGILE') {
-    return `Rentabilité fragile — tout imprévu peut compromettre la marge. Surveillez de près l'exécution.`;
-  }
-  if (input.objective === 'nouveau_client') {
-    return `Bonne opportunité d'acquisition client avec une marge acceptable — prix ajusté pour maximiser les chances.`;
-  }
-  return `Projet rentable avec une marge confortable — conditions favorables pour soumissionner.`;
-}
-
-function getBiggestCost(input: SubmissionInput): string {
-  const labor = input.employees * input.days * input.hoursPerDay * input.hourlyRate;
-  const materials = input.materialsGlobal || input.materialsDetailed.reduce((s, m) => s + m.quantity * m.unitPrice, 0);
-  const costs: [string, number][] = [
-    ['main-d\'œuvre', labor],
-    ['matériaux', materials],
-    ['sous-traitants', input.subcontractors],
-    ['équipements', input.equipment],
-  ];
-  costs.sort((a, b) => b[1] - a[1]);
-  return costs[0][0];
 }

@@ -3,9 +3,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from "react";
-import { Zap, Settings, Calculator, BarChart3 } from "lucide-react";
+import React, { useState } from "react";
+import {
+  Zap,
+  Settings,
+  Calculator,
+  BarChart3,
+  FolderOpen,
+  Trash2,
+  Clock,
+  History,
+  Plus,
+} from "lucide-react";
 import { SimulationState, ModeType } from "../types";
+import { calculateSimulation } from "../utils/pricingEngine";
 import HuviLogo from "./HuviLogo";
 
 interface HomeDashboardProps {
@@ -15,9 +26,55 @@ interface HomeDashboardProps {
   onDeleteSimulation: (id: string, e: React.MouseEvent) => void;
 }
 
+const MODE_META: Record<
+  ModeType,
+  { label: string; badge: string; dot: string }
+> = {
+  quick: {
+    label: "Quick",
+    badge: "bg-amber-500/15 text-amber-400 border-amber-500/10",
+    dot: "bg-amber-500",
+  },
+  standard: {
+    label: "Standard",
+    badge: "bg-blue-500/15 text-blue-400 border-blue-500/10",
+    dot: "bg-blue-500",
+  },
+  pro: {
+    label: "Pro",
+    badge: "bg-purple-500/15 text-purple-400 border-purple-500/10",
+    dot: "bg-purple-500",
+  },
+};
+
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString("fr-CA", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return "";
+  }
+}
+
+function getRealMargin(sim: SimulationState): number | null {
+  try {
+    return calculateSimulation(sim).margins.realPercent;
+  } catch {
+    return null;
+  }
+}
+
 export default function HomeDashboard({
+  pastSimulations,
+  onSelectSimulation,
   onNewSimulation,
+  onDeleteSimulation,
 }: HomeDashboardProps) {
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
   return (
     <div className="w-full max-w-6xl mx-auto px-4 py-8 text-slate-100" id="home_dashboard">
       {/* Hero Welcome Unit */}
@@ -103,6 +160,138 @@ export default function HomeDashboard({
             </p>
           </div>
         </button>
+      </div>
+
+      {/* Saved Simulations History */}
+      <div className="max-w-4xl mx-auto mb-12">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+            <History size={14} />
+            Simulations enregistrées
+          </h2>
+          {pastSimulations.length > 0 && (
+            <span className="text-[11px] font-mono text-slate-500">
+              {pastSimulations.length} sur cet appareil
+            </span>
+          )}
+        </div>
+
+        {pastSimulations.length === 0 ? (
+          <div className="bg-[#111727]/40 border border-dashed border-slate-800 rounded-3xl p-8 text-center space-y-3">
+            <p className="text-sm font-bold text-slate-300">
+              Aucune simulation enregistrée sur cet appareil
+            </p>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+              Vos simulations sauvegardées restent sur cet appareil (localStorage).
+              Créez votre première simulation pour la retrouver ici.
+            </p>
+            <button
+              onClick={() => onNewSimulation("standard")}
+              className="inline-flex items-center gap-1.5 mt-1 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/40"
+            >
+              <Plus size={14} />
+              Créer une simulation
+            </button>
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {pastSimulations.map((sim) => {
+              const realMargin = getRealMargin(sim);
+              const meta = MODE_META[sim.mode] || MODE_META.quick;
+              const isConfirming = confirmingId === sim.id;
+
+              return (
+                <li key={sim.id}>
+                  <div className="bg-[#111727]/60 hover:bg-[#151c30] border border-slate-800/80 hover:border-orange-500/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-3 transition-all duration-300">
+                    {/* Rouvrir : clickable info block */}
+                    <button
+                      onClick={() => onSelectSimulation(sim.id)}
+                      title="Rouvrir cette simulation"
+                      className="flex-1 text-left min-w-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/40 rounded-lg"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`h-1.5 w-1.5 rounded-full ${meta.dot} shrink-0`} />
+                        <span className="font-bold text-white truncate">
+                          {sim.projectName || "Simulation sans nom"}
+                        </span>
+                        <span
+                          className={`text-[10px] font-mono py-0.5 px-2 rounded-full border ${meta.badge} shrink-0`}
+                        >
+                          {meta.label}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-[11px] text-slate-500 font-mono">
+                        <span className="flex items-center gap-1">
+                          <Clock size={11} />
+                          {formatDate(sim.createdAt)}
+                        </span>
+                        <span className="truncate">
+                          {sim.measurement.tradeType} · {sim.measurement.quantity} {sim.measurement.unit}
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Marge calculée */}
+                    {realMargin !== null && (
+                      <div className="sm:text-right shrink-0">
+                        <span className="block text-[9px] uppercase font-bold text-slate-500 tracking-wider">
+                          Marge réelle
+                        </span>
+                        <span
+                          className={`text-sm font-black font-mono ${
+                            realMargin >= 0 ? "text-green-400" : "text-red-400"
+                          }`}
+                        >
+                          {realMargin.toFixed(1)} %
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => onSelectSimulation(sim.id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/40"
+                      >
+                        <FolderOpen size={13} />
+                        Rouvrir
+                      </button>
+
+                      {isConfirming ? (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={(e) => {
+                              onDeleteSimulation(sim.id, e);
+                              setConfirmingId(null);
+                            }}
+                            className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition-all cursor-pointer"
+                          >
+                            Confirmer
+                          </button>
+                          <button
+                            onClick={() => setConfirmingId(null)}
+                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-lg transition-all cursor-pointer"
+                          >
+                            Annuler
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmingId(sim.id)}
+                          aria-label={`Supprimer ${sim.projectName || "cette simulation"}`}
+                          title="Supprimer"
+                          className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all cursor-pointer"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
 
       <div className="text-center text-slate-500 text-xs font-mono max-w-md mx-auto leading-relaxed border-t border-slate-900 pt-6">

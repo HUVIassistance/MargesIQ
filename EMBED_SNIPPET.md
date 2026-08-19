@@ -19,20 +19,9 @@ Les paramètres se combinent : `?embed=1&mode=quick`.
 
 ## Snippets prêts à copier
 
-### Intégration complète (header/footer de l'outil visibles)
+### Embed (cas le plus fréquent) — sans mode
 
-```html
-<iframe
-  src="https://marges.huvioptimisation.com/"
-  width="100%"
-  height="900"
-  style="border:0;"
-  loading="lazy"
-  title="Marges IQ — Calculateur de marge"
-></iframe>
-```
-
-### Mode embed (zéro chrome)
+L'utilisateur arrive sur le dashboard et choisit lui-même son mode. À privilégier par défaut.
 
 ```html
 <iframe
@@ -45,9 +34,12 @@ Les paramètres se combinent : `?embed=1&mode=quick`.
 ></iframe>
 ```
 
-### Embed + deep-link vers le mode Quick
+### Embed + deep-link vers un mode précis
+
+Ouvre directement une nouvelle simulation dans le mode choisi.
 
 ```html
+<!-- Mode Quick -->
 <iframe
   src="https://marges.huvioptimisation.com/?embed=1&mode=quick"
   width="100%"
@@ -55,6 +47,41 @@ Les paramètres se combinent : `?embed=1&mode=quick`.
   style="border:0;"
   loading="lazy"
   title="Marges IQ — Calculateur de marge (mode rapide)"
+></iframe>
+
+<!-- Mode Standard -->
+<iframe
+  src="https://marges.huvioptimisation.com/?embed=1&mode=standard"
+  width="100%"
+  height="850"
+  style="border:0;"
+  loading="lazy"
+  title="Marges IQ — Calculateur de marge (mode standard)"
+></iframe>
+
+<!-- Mode Pro -->
+<iframe
+  src="https://marges.huvioptimisation.com/?embed=1&mode=pro"
+  width="100%"
+  height="850"
+  style="border:0;"
+  loading="lazy"
+  title="Marges IQ — Calculateur de marge (mode pro)"
+></iframe>
+```
+
+### Intégration complète (header/footer de l'outil visibles)
+
+Utile uniquement si vous souhaitez afficher le chrome complet de l'outil.
+
+```html
+<iframe
+  src="https://marges.huvioptimisation.com/"
+  width="100%"
+  height="900"
+  style="border:0;"
+  loading="lazy"
+  title="Marges IQ — Calculateur de marge"
 ></iframe>
 ```
 

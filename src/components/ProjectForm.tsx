@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ChevronRight,
   ChevronLeft,
@@ -300,6 +300,88 @@ function Hint({ text }: { text: string }) {
     <div className="flex items-start gap-2.5 p-4 rounded-2xl bg-orange-500/5 border border-orange-500/10 mb-6">
       <Info className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
       <p className="text-xs text-slate-400 leading-relaxed">{text}</p>
+    </div>
+  );
+}
+
+/**
+ * Champ numérique avec minimum obligatoire, adapté mobile :
+ * - la valeur vide est autorisée à la saisie (pas de blocage du clavier)
+ * - la validation se fait au blur : si vide ou < min → bordure rouge + message « Minimum : N »
+ * - le calcul (onChange vers le parent) ne reçoit JAMAIS une valeur invalide :
+ *   le state global conserve la dernière valeur valide tant que la saisie est invalide
+ */
+function MinNumberInput({
+  value,
+  min = 1,
+  onChange,
+  placeholder,
+  className = "",
+}: {
+  value: number;
+  min?: number;
+  onChange: (value: number) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const [draft, setDraft] = useState<string>(value !== undefined && value !== null ? String(value) : "");
+  const [error, setError] = useState<string | null>(null);
+  const focusedRef = useRef(false);
+
+  // Synchroniser depuis l'état parent uniquement quand le champ n'est pas en cours d'édition
+  useEffect(() => {
+    if (!focusedRef.current) {
+      setDraft(value !== undefined && value !== null ? String(value) : "");
+    }
+  }, [value]);
+
+  const isValid = (raw: string): boolean => {
+    if (raw.trim() === "") return false;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= min;
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setDraft(raw);
+    setError(null);
+    if (isValid(raw)) {
+      onChange(Number(raw));
+    }
+  };
+
+  const handleFocus = () => {
+    focusedRef.current = true;
+  };
+
+  const handleBlur = () => {
+    focusedRef.current = false;
+    if (!isValid(draft)) {
+      setError(`Minimum : ${min}`);
+    }
+  };
+
+  return (
+    <div className="space-y-1">
+      <input
+        type="number"
+        inputMode="decimal"
+        min={min}
+        value={draft}
+        placeholder={placeholder}
+        onChange={handleChange}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        aria-invalid={!!error}
+        className={`${className} ${
+          error ? "!border-red-500 !ring-2 !ring-red-500/40" : ""
+        }`}
+      />
+      {error && (
+        <p className="text-[10px] text-red-400 font-bold" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -654,38 +736,34 @@ function StepCosts({ state, setState, tradeProfile }: StepCostsProps) {
 
                 <div className="grid grid-cols-4 gap-2.5">
                   <Field label="Effectif">
-                    <input
-                      type="number"
-                      min="1"
+                    <MinNumberInput
                       value={r.count}
-                      onChange={(e) => handleUpdateLaborRole(i, { count: Math.max(1, Number(e.target.value)) })}
+                      min={1}
+                      onChange={(v) => handleUpdateLaborRole(i, { count: v })}
                       className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg font-mono text-center text-xs text-white"
                     />
                   </Field>
                   <Field label="Jours">
-                    <input
-                      type="number"
-                      min="1"
+                    <MinNumberInput
                       value={r.days}
-                      onChange={(e) => handleUpdateLaborRole(i, { days: Math.max(1, Number(e.target.value)) })}
+                      min={1}
+                      onChange={(v) => handleUpdateLaborRole(i, { days: v })}
                       className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg font-mono text-center text-xs text-white"
                     />
                   </Field>
                   <Field label="Hrs/Jour">
-                    <input
-                      type="number"
-                      min="1"
+                    <MinNumberInput
                       value={r.hoursPerDay}
-                      onChange={(e) => handleUpdateLaborRole(i, { hoursPerDay: Math.max(1, Number(e.target.value)) })}
+                      min={1}
+                      onChange={(v) => handleUpdateLaborRole(i, { hoursPerDay: v })}
                       className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg font-mono text-center text-xs text-white"
                     />
                   </Field>
                   <Field label="Taux ($)">
-                    <input
-                      type="number"
-                      min="1"
+                    <MinNumberInput
                       value={r.hourlyRate}
-                      onChange={(e) => handleUpdateLaborRole(i, { hourlyRate: Math.max(1, Number(e.target.value)) })}
+                      min={1}
+                      onChange={(v) => handleUpdateLaborRole(i, { hourlyRate: v })}
                       className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg font-mono text-center text-xs text-white"
                     />
                   </Field>
@@ -733,60 +811,56 @@ function StepCosts({ state, setState, tradeProfile }: StepCostsProps) {
                 <p className="text-[10px] text-slate-500 mb-3 uppercase tracking-wider font-semibold">Aucun rôle détaillé — utilisation de l'équipe globale :</p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <Field label="Employés">
-                    <input
-                      type="number"
-                      min="1"
+                    <MinNumberInput
                       value={state.directCosts.labor.employees}
-                      onChange={(e) => setState((prev) => ({
+                      min={1}
+                      onChange={(v) => setState((prev) => ({
                         ...prev,
                         directCosts: {
                           ...prev.directCosts,
-                          labor: { ...prev.directCosts.labor, employees: Math.max(1, Number(e.target.value)) }
+                          labor: { ...prev.directCosts.labor, employees: v }
                         }
                       }))}
                       className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-white"
                     />
                   </Field>
                   <Field label="Jours">
-                    <input
-                      type="number"
-                      min="1"
+                    <MinNumberInput
                       value={state.directCosts.labor.days}
-                      onChange={(e) => setState((prev) => ({
+                      min={1}
+                      onChange={(v) => setState((prev) => ({
                         ...prev,
                         directCosts: {
                           ...prev.directCosts,
-                          labor: { ...prev.directCosts.labor, days: Math.max(1, Number(e.target.value)) }
+                          labor: { ...prev.directCosts.labor, days: v }
                         }
                       }))}
                       className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-white"
                     />
                   </Field>
                   <Field label="H / Jr">
-                    <input
-                      type="number"
-                      min="1"
+                    <MinNumberInput
                       value={state.directCosts.labor.hoursPerDay}
-                      onChange={(e) => setState((prev) => ({
+                      min={1}
+                      onChange={(v) => setState((prev) => ({
                         ...prev,
                         directCosts: {
                           ...prev.directCosts,
-                          labor: { ...prev.directCosts.labor, hoursPerDay: Math.max(1, Number(e.target.value)) }
+                          labor: { ...prev.directCosts.labor, hoursPerDay: v }
                         }
                       }))}
                       className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-white"
                     />
                   </Field>
                   <Field label="Taux Moyen ($)">
-                    <input
-                      type="number"
-                      min="1"
+                    <MinNumberInput
                       value={state.directCosts.labor.hourlyRate}
-                      onChange={(e) => setState((prev) => ({
+                      min={1}
+                      onChange={(v) => setState((prev) => ({
                         ...prev,
                         directCosts: {
                           ...prev.directCosts,
-                          labor: { ...prev.directCosts.labor, hourlyRate: Math.max(1, Number(e.target.value)) }
+                          labor: { ...prev.directCosts.labor, hourlyRate: v }
                         }
                       }))}
                       className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-white"
@@ -801,60 +875,56 @@ function StepCosts({ state, setState, tradeProfile }: StepCostsProps) {
         <Section title="Main-d'œuvre globale (Catégorie A)" icon={<span>🪚</span>}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Field label="Nombre d'employés" hint="Total sur le chantier">
-              <input
-                type="number"
-                min="1"
+              <MinNumberInput
                 value={state.directCosts.labor.employees}
-                onChange={(e) => setState((prev) => ({
+                min={1}
+                onChange={(v) => setState((prev) => ({
                   ...prev,
                   directCosts: {
                     ...prev.directCosts,
-                    labor: { ...prev.directCosts.labor, employees: Math.max(1, Number(e.target.value)) }
+                    labor: { ...prev.directCosts.labor, employees: v }
                   }
                 }))}
                 className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono text-white"
               />
             </Field>
             <Field label="Jours estimés" hint="Durée estimée totale">
-              <input
-                type="number"
-                min="1"
+              <MinNumberInput
                 value={state.directCosts.labor.days}
-                onChange={(e) => setState((prev) => ({
+                min={1}
+                onChange={(v) => setState((prev) => ({
                   ...prev,
                   directCosts: {
                     ...prev.directCosts,
-                    labor: { ...prev.directCosts.labor, days: Math.max(1, Number(e.target.value)) }
+                    labor: { ...prev.directCosts.labor, days: v }
                   }
                 }))}
                 className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono text-white"
               />
             </Field>
             <Field label="Heures / jour" hint="Journée moyenne type (ex: 8)">
-              <input
-                type="number"
-                min="1"
+              <MinNumberInput
                 value={state.directCosts.labor.hoursPerDay}
-                onChange={(e) => setState((prev) => ({
+                min={1}
+                onChange={(v) => setState((prev) => ({
                   ...prev,
                   directCosts: {
                     ...prev.directCosts,
-                    labor: { ...prev.directCosts.labor, hoursPerDay: Math.max(1, Number(e.target.value)) }
+                    labor: { ...prev.directCosts.labor, hoursPerDay: v }
                   }
                 }))}
                 className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono text-white"
               />
             </Field>
             <Field label="Taux Moyen ($ / h)" hint="Salaire horaire chargé">
-              <input
-                type="number"
-                min="1"
+              <MinNumberInput
                 value={state.directCosts.labor.hourlyRate}
-                onChange={(e) => setState((prev) => ({
+                min={1}
+                onChange={(v) => setState((prev) => ({
                   ...prev,
                   directCosts: {
                     ...prev.directCosts,
-                    labor: { ...prev.directCosts.labor, hourlyRate: Math.max(1, Number(e.target.value)) }
+                    labor: { ...prev.directCosts.labor, hourlyRate: v }
                   }
                 }))}
                 className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono text-white"
@@ -1366,31 +1436,29 @@ function CacSection({ state, setState, isQuick, isPro }: CacSectionProps) {
           <p className="text-[10px] text-slate-500">Données clés de l'entonnoir commercial :</p>
           <div className="grid grid-cols-3 gap-3">
             <Field label="Leads Totaux">
-              <input
-                type="number"
+              <MinNumberInput
                 value={pipelineLeads}
-                onChange={(e) => setPipelineLeads(Math.max(1, Number(e.target.value)))}
+                min={1}
+                onChange={(v) => setPipelineLeads(v)}
                 className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl font-mono text-xs text-white"
               />
             </Field>
             <Field label="Taux Conversion (%)">
-              <input
-                type="number"
-                min="1"
-                max="100"
+              <MinNumberInput
                 value={state.businessCosts.cacConversionRate || 10}
-                onChange={(e) => setState((prev) => ({
+                min={1}
+                onChange={(v) => setState((prev) => ({
                   ...prev,
-                  businessCosts: { ...prev.businessCosts, cacConversionRate: Math.max(1, Number(e.target.value)) }
+                  businessCosts: { ...prev.businessCosts, cacConversionRate: v }
                 }))}
                 className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl font-mono text-xs text-white"
               />
             </Field>
             <Field label="Coût / Lead ($)">
-              <input
-                type="number"
+              <MinNumberInput
                 value={rawCostPerLead}
-                onChange={(e) => setRawCostPerLead(Math.max(1, Number(e.target.value)))}
+                min={1}
+                onChange={(v) => setRawCostPerLead(v)}
                 className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl font-mono text-xs text-white"
               />
             </Field>
@@ -1449,13 +1517,12 @@ function StepMargin({ state, setState }: StepMarginProps) {
             label={state.margin.type === "percent" ? "Ratio de marge cible (%)" : "Montant à dégager ($)"}
             hint={state.margin.type === "percent" ? "Valeur typique : 20% à 35% de marge brute sur contrat." : "Coût net final ajouté."}
           >
-            <input
-              type="number"
-              min="1"
+            <MinNumberInput
               value={state.margin.targetValue}
-              onChange={(e) => setState((prev) => ({
+              min={1}
+              onChange={(v) => setState((prev) => ({
                 ...prev,
-                margin: { ...prev.margin, targetValue: Math.max(1, Number(e.target.value)) }
+                margin: { ...prev.margin, targetValue: v }
               }))}
               className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/40 font-mono font-bold text-sm text-white"
             />
@@ -1636,10 +1703,10 @@ function StepProAnalysis({ state, setState }: StepProAnalysisProps) {
               />
             </Field>
             <Field label="Capacité maximum (Seuil)">
-              <input
-                type="number"
+              <MinNumberInput
                 value={proCap.maxProjects || 10}
-                onChange={(e) => updateProCapacity({ maxProjects: Math.max(1, Number(e.target.value)) })}
+                min={1}
+                onChange={(v) => updateProCapacity({ maxProjects: v })}
                 className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl font-mono text-center text-xs text-white"
               />
             </Field>

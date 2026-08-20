@@ -233,7 +233,16 @@ export default function App() {
               STABLE v1.0.0
             </div>
             <div className="border-l border-slate-800/80 pl-4 h-9 flex items-center md:scale-100 scale-90 origin-right">
-              <HuviLogo size="md" />
+              <a
+                href="https://www.huvioptimisation.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="HUVI Optimisation — site principal"
+                aria-label="HUVI Optimisation — site principal (nouvel onglet)"
+                className="block hover:opacity-80 transition-opacity"
+              >
+                <HuviLogo size="md" />
+              </a>
             </div>
           </div>
         </div>

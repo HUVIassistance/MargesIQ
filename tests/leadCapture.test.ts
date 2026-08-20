@@ -11,6 +11,7 @@ import assert from "node:assert/strict";
 import {
   EMAIL_STORAGE_KEY,
   REASK_AFTER_MS,
+  LEAD_WEBHOOK_URL,
   isValidEmail,
   normalizeEmail,
   shouldShowGate,
@@ -163,17 +164,22 @@ test("buildLeadPayload : structure exacte du POST Make", () => {
   });
 });
 
-test("sendLeadToWebhook : URL non configurée → skip silencieux (pas d'envoi)", async () => {
-  const calls: string[] = [];
+test("sendLeadToWebhook : URL configurée → POST du payload au webhook Make", async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => {
-    calls.push("fetch");
-    throw new Error("ne devrait jamais être appelé");
-  };
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    calls.push({ url: String(url), init });
+    return new Response("{}", { status: 200 });
+  }) as typeof fetch;
   try {
-    const ok = await sendLeadToWebhook(buildLeadPayload("a@b.ca", false, 0));
-    assert.equal(ok, false);
-    assert.deepEqual(calls, []);
+    const payload = buildLeadPayload("a@b.ca", true, 3);
+    const ok = await sendLeadToWebhook(payload);
+    assert.equal(ok, true);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, LEAD_WEBHOOK_URL);
+    assert.equal(calls[0].init?.method, "POST");
+    assert.equal(calls[0].init?.headers?.["Content-Type"], "application/json");
+    assert.deepEqual(JSON.parse(String(calls[0].init?.body)), payload);
   } finally {
     globalThis.fetch = originalFetch;
   }

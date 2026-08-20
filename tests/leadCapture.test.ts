@@ -1,5 +1,5 @@
 /**
- * Tests headless — lead capture (gate email + reask 45 j)
+ * Tests headless — lead capture (gate enrichi + reask 45 j)
  *
  * Exécution : npm test  (tsx --test tests/*.test.ts)
  * Logique pure testée sans DOM ; localStorage et Date mockés par injection.
@@ -9,18 +9,20 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  CONTACT_STORAGE_KEY,
   EMAIL_STORAGE_KEY,
   REASK_AFTER_MS,
   LEAD_WEBHOOK_URL,
   isValidEmail,
+  isValidName,
   normalizeEmail,
   shouldShowGate,
   shouldShowReask,
-  getStoredEmail,
-  saveEmail,
+  getStoredContact,
+  saveContact,
   buildLeadPayload,
   sendLeadToWebhook,
-  StoredEmail,
+  StoredContact,
 } from "../src/lib/leadCapture";
 
 /** Mock localStorage minimal conforme à Pick<Storage, ...>. */
@@ -31,7 +33,22 @@ function makeStorage(initial: Record<string, string> = {}) {
     setItem: (k: string, v: string) => {
       map.set(k, v);
     },
+    removeItem: (k: string) => {
+      map.delete(k);
+    },
     _map: map,
+  };
+}
+
+function makeContact(overrides: Partial<StoredContact> = {}): StoredContact {
+  return {
+    firstName: "Patricia",
+    lastName: "Tremblay",
+    company: "Rénovations Tremblay inc.",
+    email: "patricia@entreprise.ca",
+    capturedAt: Date.now(),
+    consent: false,
+    ...overrides,
   };
 }
 
@@ -70,19 +87,28 @@ test("normalizeEmail : trim + minuscules", () => {
   assert.equal(normalizeEmail("  Patricia@Entreprise.CA "), "patricia@entreprise.ca");
 });
 
+// ── Validation prénom / nom / entreprise ──────────────────────────
+
+test("isValidName : 2 caractères minimum après trim", () => {
+  assert.equal(isValidName("Patricia"), true);
+  assert.equal(isValidName("  Léa "), true); // trim
+  assert.equal(isValidName("A"), false);
+  assert.equal(isValidName("  "), false);
+  assert.equal(isValidName(""), false);
+});
+
 // ── Gate (1re fois, bloquant) ─────────────────────────────────────
 
-test("gate au 1er clic mode : aucun email stocké → gate requis", () => {
+test("gate au 1er clic mode : aucun contact stocké → gate requis", () => {
   assert.equal(shouldShowGate(null), true);
 });
 
-test("gate absent si email présent et valide", () => {
-  const stored: StoredEmail = { email: VALID, capturedAt: Date.now(), consent: false };
-  assert.equal(shouldShowGate(stored), false);
+test("gate absent si contact présent et valide", () => {
+  assert.equal(shouldShowGate(makeContact()), false);
 });
 
 test("gate requis si email stocké invalide (corrompu)", () => {
-  const stored: StoredEmail = { email: "pas-un-email", capturedAt: Date.now(), consent: false };
+  const stored: StoredContact = makeContact({ email: "pas-un-email" });
   assert.equal(shouldShowGate(stored), true);
 });
 
@@ -90,23 +116,23 @@ test("gate requis si email stocké invalide (corrompu)", () => {
 
 test("reask après 45 jours (mock date) : déclenché", () => {
   const now = 1_800_000_000_000;
-  const stored: StoredEmail = { email: VALID, capturedAt: now - (46 * DAY_MS), consent: true };
+  const stored = makeContact({ capturedAt: now - 46 * DAY_MS, consent: true });
   assert.equal(shouldShowReask(stored, now), true);
 });
 
 test("reask AVANT 45 jours : pas déclenché", () => {
   const now = 1_800_000_000_000;
-  const stored: StoredEmail = { email: VALID, capturedAt: now - (44 * DAY_MS), consent: true };
+  const stored = makeContact({ capturedAt: now - 44 * DAY_MS, consent: true });
   assert.equal(shouldShowReask(stored, now), false);
 });
 
 test("reask à exactement 45 jours : déclenché (>= seuil)", () => {
   const now = 1_800_000_000_000;
-  const stored: StoredEmail = { email: VALID, capturedAt: now - REASK_AFTER_MS, consent: true };
+  const stored = makeContact({ capturedAt: now - REASK_AFTER_MS, consent: true });
   assert.equal(shouldShowReask(stored, now), true);
 });
 
-test("reask sans email stocké : jamais déclenché", () => {
+test("reask sans contact stocké : jamais déclenché", () => {
   assert.equal(shouldShowReask(null, Date.now()), false);
 });
 
@@ -114,48 +140,107 @@ test("reask sans email stocké : jamais déclenché", () => {
 
 test("dismiss du reask ne modifie pas le stockage → re-tenté à la prochaine ouverture", () => {
   const storage = makeStorage({
-    [EMAIL_STORAGE_KEY]: JSON.stringify({ email: VALID, capturedAt: 1_000_000_000, consent: true }),
+    [CONTACT_STORAGE_KEY]: JSON.stringify(makeContact({ capturedAt: 1_000_000_000, consent: true })),
   });
-  const stored = getStoredEmail(storage as unknown as Storage);
+  const stored = getStoredContact(storage as unknown as Storage);
   // [Plus tard] ne fait AUCUN save : on vérifie que la donnée reste inchangée...
-  const before = storage.getItem(EMAIL_STORAGE_KEY);
+  const before = storage.getItem(CONTACT_STORAGE_KEY);
   // ...et que le reask est toujours dû à la prochaine ouverture.
   assert.equal(shouldShowReask(stored, Date.now()), true);
-  assert.equal(storage.getItem(EMAIL_STORAGE_KEY), before);
+  assert.equal(storage.getItem(CONTACT_STORAGE_KEY), before);
 });
 
 // ── Persistance localStorage ──────────────────────────────────────
 
-test("saveEmail : persiste { email, capturedAt, consent } sous marges-iq:email", () => {
+test("saveContact : persiste le contact complet sous marges-iq:contact", () => {
   const storage = makeStorage();
   const capturedAt = 1_700_000_000_000;
-  const saved = saveEmail("  A@B.ca ", true, capturedAt, storage as unknown as Storage);
-  assert.deepEqual(saved, { email: "a@b.ca", capturedAt, consent: true });
-  const raw = JSON.parse(storage.getItem(EMAIL_STORAGE_KEY)!);
-  assert.deepEqual(raw, { email: "a@b.ca", capturedAt, consent: true });
-});
-
-test("getStoredEmail : lit et normalise l'email stocké", () => {
-  const storage = makeStorage({
-    [EMAIL_STORAGE_KEY]: JSON.stringify({ email: "  Pat@X.ca ", capturedAt: 123, consent: false }),
+  const saved = saveContact("  Patricia ", " Tremblay ", " Rénovations Tremblay inc. ", "  A@B.ca ", true, capturedAt, storage as unknown as Storage);
+  assert.deepEqual(saved, {
+    firstName: "Patricia",
+    lastName: "Tremblay",
+    company: "Rénovations Tremblay inc.",
+    email: "a@b.ca",
+    capturedAt,
+    consent: true,
   });
-  const stored = getStoredEmail(storage as unknown as Storage);
-  assert.deepEqual(stored, { email: "pat@x.ca", capturedAt: 123, consent: false });
+  const raw = JSON.parse(storage.getItem(CONTACT_STORAGE_KEY)!);
+  assert.deepEqual(raw, {
+    firstName: "Patricia",
+    lastName: "Tremblay",
+    company: "Rénovations Tremblay inc.",
+    email: "a@b.ca",
+    capturedAt,
+    consent: true,
+  });
 });
 
-test("getStoredEmail : données corrompues → null (jamais de crash)", () => {
-  const storage = makeStorage({ [EMAIL_STORAGE_KEY]: "{pas du json" });
-  assert.equal(getStoredEmail(storage as unknown as Storage), null);
+test("getStoredContact : lit et normalise le contact stocké", () => {
+  const storage = makeStorage({
+    [CONTACT_STORAGE_KEY]: JSON.stringify({
+      firstName: "  Pat ",
+      lastName: " Tremblay ",
+      company: "  Rénovations inc. ",
+      email: "  Pat@X.ca ",
+      capturedAt: 123,
+      consent: false,
+    }),
+  });
+  const stored = getStoredContact(storage as unknown as Storage);
+  assert.deepEqual(stored, {
+    firstName: "Pat",
+    lastName: "Tremblay",
+    company: "Rénovations inc.",
+    email: "pat@x.ca",
+    capturedAt: 123,
+    consent: false,
+  });
+});
+
+test("getStoredContact : données corrompues → null (jamais de crash)", () => {
+  const storage = makeStorage({ [CONTACT_STORAGE_KEY]: "{pas du json" });
+  assert.equal(getStoredContact(storage as unknown as Storage), null);
   const empty = makeStorage();
-  assert.equal(getStoredEmail(empty as unknown as Storage), null);
+  assert.equal(getStoredContact(empty as unknown as Storage), null);
+});
+
+test("getStoredContact : migration depuis l'ancienne clé marges-iq:email (compat ascendant)", () => {
+  const storage = makeStorage({
+    [EMAIL_STORAGE_KEY]: JSON.stringify({ email: "  Patricia@Entreprise.CA ", capturedAt: 1_234_567_890, consent: true }),
+  });
+  const migrated = getStoredContact(storage as unknown as Storage);
+  assert.deepEqual(migrated, {
+    firstName: "",
+    lastName: "",
+    company: "",
+    email: "patricia@entreprise.ca",
+    capturedAt: 1_234_567_890,
+    consent: true,
+  });
+  // La nouvelle clé est écrite pour la prochaine lecture ; l'ancienne est conservée (réversibilité).
+  assert.ok(storage.getItem(CONTACT_STORAGE_KEY), "la nouvelle clé doit être écrite après migration");
+  assert.ok(storage.getItem(EMAIL_STORAGE_KEY), "l'ancienne clé doit être conservée");
+});
+
+test("getStoredContact : la nouvelle clé prime sur l'ancienne (pas de régression après enrichissement)", () => {
+  const storage = makeStorage({
+    [CONTACT_STORAGE_KEY]: JSON.stringify(makeContact()),
+    [EMAIL_STORAGE_KEY]: JSON.stringify({ email: "vieux@email.ca", capturedAt: 1, consent: false }),
+  });
+  const stored = getStoredContact(storage as unknown as Storage);
+  assert.equal(stored?.email, VALID);
+  assert.equal(stored?.firstName, "Patricia");
 });
 
 // ── Payload webhook ───────────────────────────────────────────────
 
-test("buildLeadPayload : structure exacte du POST Make", () => {
+test("buildLeadPayload : structure exacte du POST Make (payload complet)", () => {
   const capturedAt = 1_700_000_000_000;
-  const payload = buildLeadPayload("  A@B.ca ", true, 3, capturedAt);
+  const payload = buildLeadPayload("  Patricia ", " Tremblay ", " Rénovations Tremblay inc. ", "  A@B.ca ", true, 3, capturedAt);
   assert.deepEqual(payload, {
+    firstName: "Patricia",
+    lastName: "Tremblay",
+    company: "Rénovations Tremblay inc.",
     email: "a@b.ca",
     consent: true,
     source: "Marges IQ",
@@ -172,7 +257,7 @@ test("sendLeadToWebhook : URL configurée → POST du payload au webhook Make", 
     return new Response("{}", { status: 200 });
   }) as typeof fetch;
   try {
-    const payload = buildLeadPayload("a@b.ca", true, 3);
+    const payload = buildLeadPayload("Patricia", "Tremblay", "Rénovations inc.", "a@b.ca", true, 3);
     const ok = await sendLeadToWebhook(payload);
     assert.equal(ok, true);
     assert.equal(calls.length, 1);

@@ -12,13 +12,14 @@ import PrintPDF from "./components/PrintPDF";
 import HuviLogo from "./components/HuviLogo";
 import EmailGateModal from "./components/EmailGateModal";
 import {
-  getStoredEmail,
-  saveEmail,
+  getStoredContact,
+  saveContact,
   shouldShowGate,
   shouldShowReask,
   buildLeadPayload,
   sendLeadToWebhook,
-  StoredEmail,
+  StoredContact,
+  GateContactData,
 } from "./lib/leadCapture";
 
 // ===== Persistance locale (localStorage, préfixe marges-iq:) =====
@@ -131,7 +132,7 @@ interface GateState {
  *    sur Quick/Standard/Pro) ; seul le reask doux 45 j peut s'afficher
  */
 function computeInitialGate(): GateState | null {
-  const stored = getStoredEmail();
+  const stored = getStoredContact();
   const mode = getInitialMode();
   if (mode) {
     if (shouldShowGate(stored)) {
@@ -191,8 +192,8 @@ export default function App() {
   };
 
   const handleNewSimulation = (mode: ModeType) => {
-    // Gate email bloquant (1re fois) : le mode sélectionné démarre APRÈS validation.
-    const stored = getStoredEmail();
+    // Gate bloquant (1re fois) : le mode sélectionné démarre APRÈS validation.
+    const stored = getStoredContact();
     if (shouldShowGate(stored)) {
       setGateState({ mode: "gate", pendingMode: mode });
       return;
@@ -201,20 +202,31 @@ export default function App() {
   };
 
   /** Validation du gate bloquant (1re fois) : persiste + envoie le lead + démarre le mode. */
-  const handleGateConfirm = (email: string, consent: boolean) => {
-    const stored = saveEmail(email, consent);
-    void sendLeadToWebhook(buildLeadPayload(email, consent, pastSimulations.length, stored.capturedAt));
+  const handleGateConfirm = (contact: GateContactData, consent: boolean) => {
+    const stored = saveContact(contact.firstName, contact.lastName, contact.company, contact.email, consent);
+    void sendLeadToWebhook(
+      buildLeadPayload(contact.firstName, contact.lastName, contact.company, contact.email, consent, pastSimulations.length, stored.capturedAt)
+    );
     if (gateState?.pendingMode) {
       startSimulation(gateState.pendingMode);
     }
     setGateState(null);
   };
 
-  /** [Continuer] du reask 45 jours : met à jour capturedAt + renvoie le lead. */
-  const handleReaskConfirm = (email: string) => {
-    const prev = getStoredEmail();
-    const stored = saveEmail(email, prev?.consent ?? false, Date.now());
-    void sendLeadToWebhook(buildLeadPayload(email, stored.consent, pastSimulations.length, stored.capturedAt));
+  /** [Continuer] du reask 45 jours : met à jour le contact + capturedAt + renvoie le lead. */
+  const handleReaskConfirm = (contact: GateContactData) => {
+    const prev = getStoredContact();
+    const stored = saveContact(
+      contact.firstName,
+      contact.lastName,
+      contact.company,
+      contact.email,
+      prev?.consent ?? false,
+      Date.now()
+    );
+    void sendLeadToWebhook(
+      buildLeadPayload(contact.firstName, contact.lastName, contact.company, contact.email, stored.consent, pastSimulations.length, stored.capturedAt)
+    );
     setGateState(null);
   };
 
@@ -375,11 +387,11 @@ export default function App() {
       {gateState && (
         <EmailGateModal
           mode={gateState.mode}
-          initialEmail={getStoredEmail()?.email ?? ""}
+          initialContact={getStoredContact() ?? undefined}
           onConfirm={
             gateState.mode === "gate"
-              ? (email, consent) => handleGateConfirm(email, consent)
-              : (email) => handleReaskConfirm(email)
+              ? (contact, consent) => handleGateConfirm(contact, consent)
+              : (contact) => handleReaskConfirm(contact)
           }
           onDismiss={gateState.mode === "reask" ? handleReaskDismiss : undefined}
         />

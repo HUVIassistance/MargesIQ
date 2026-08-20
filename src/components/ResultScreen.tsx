@@ -648,22 +648,33 @@ function PriceSimulator({ result, simPrice, setSimPrice, marginRequestedPercent 
           className="w-full accent-orange-500 cursor-pointer h-2 bg-slate-900 rounded-lg appearance-none"
         />
 
-        {/* Markers navigation */}
-        <div className="relative h-6 pt-1">
+        {/* Position markers (ticks décoratifs, non cliquables) */}
+        <div className="relative h-3" aria-hidden="true">
           {markers.map((m) => {
             const left = ((m.price - minPrice) / (maxPrice - minPrice)) * 100;
             return (
-              <button
+              <span
                 key={m.label}
-                type="button"
-                onClick={() => setSimPrice(Math.round(m.price))}
-                className="absolute -translate-x-1/2 text-[9px] text-slate-500 hover:text-orange-400 font-bold tracking-wider transition-colors font-mono cursor-pointer"
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-2.5 w-px bg-slate-600"
                 style={{ left: `${Math.max(5, Math.min(95, left))}%` }}
-              >
-                ▲ {m.label}
-              </button>
+              />
             );
           })}
+        </div>
+
+        {/* Markers navigation — pastilles côte à côte (wrap mobile), zéro chevauchement */}
+        <div className="flex flex-wrap gap-2">
+          {markers.map((m) => (
+            <button
+              key={m.label}
+              type="button"
+              onClick={() => setSimPrice(Math.round(m.price))}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[9px] font-bold tracking-wider transition-colors font-mono cursor-pointer rounded-full bg-slate-900 border border-slate-800 text-slate-400 hover:text-orange-400 hover:border-orange-500/40"
+            >
+              <span className="text-orange-500/80 text-[8px] leading-none">▲</span>
+              {m.label}
+            </button>
+          ))}
         </div>
       </div>
 

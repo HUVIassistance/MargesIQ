@@ -30,6 +30,8 @@ function createInitialSimulation(mode: ModeType): SimulationState {
       complexity: "Standard",
       unit: "pi²",
       quantity: 100,
+      quantityMode: "simple",
+      lines: [],
     },
     directCosts: {
       labor: { employees: 1, days: 1, hoursPerDay: 8, hourlyRate: 30 },

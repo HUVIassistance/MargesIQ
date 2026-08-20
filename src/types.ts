@@ -35,6 +35,13 @@ export type ComplexityType = "Standard" | "Élevé" | "Extrême";
 
 export type UnitType = "pi²" | "m³" | "unité" | "intervention" | "heure machine" | "projet global";
 
+export interface MeasurementLine {
+  id: string;
+  quantity: number;
+  unit: UnitType;
+  description?: string;
+}
+
 export interface MeasurementInput {
   tradeType: TradeType;
   operationalProfile: OperationalProfileType;
@@ -42,6 +49,9 @@ export interface MeasurementInput {
   complexity: ComplexityType;
   unit: UnitType;
   quantity: number;
+  // Mode de saisie de la quantité : « Simple » (unité + quantité globale) ou « Détaillé » (plusieurs lignes)
+  quantityMode?: "simple" | "detailed";
+  lines?: MeasurementLine[];
 }
 
 export type LevelType = "Faible" | "Moyen" | "Élevé";

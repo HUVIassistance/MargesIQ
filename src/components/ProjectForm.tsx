@@ -26,7 +26,8 @@ import {
   MaterialCostDetail,
   SubcontractorDetail,
   OverheadLineInput,
-  LaborRoleInput
+  LaborRoleInput,
+  MeasurementLine
 } from "../types";
 import { getProfileForTrade } from "../utils/pricingEngine";
 
@@ -403,6 +404,193 @@ interface StepConfigProps {
 }
 
 function StepConfig({ state, setState, trades, objectives, complexities, units }: StepConfigProps) {
+  // Mode de saisie de la quantité : « Simple » (défaut) ou « Détaillé » (lignes multiples)
+  const quantityMode = state.measurement.quantityMode || "simple";
+  const lines = state.measurement.lines || [];
+
+  const recomputeTotal = (nextLines: MeasurementLine[]): { quantity: number; unit: UnitType } => {
+    const total = nextLines.reduce((s, l) => s + (Number(l.quantity) || 0), 0);
+    return {
+      quantity: total > 0 ? total : state.measurement.quantity,
+      unit: (nextLines[0] && nextLines[0].unit) || state.measurement.unit,
+    };
+  };
+
+  const setQuantityMode = (mode: "simple" | "detailed") => {
+    setState((prev) => {
+      const prevLines = prev.measurement.lines || [];
+      const nextLines =
+        mode === "detailed" && prevLines.length === 0
+          ? [{ id: Math.random().toString(), quantity: prev.measurement.quantity, unit: prev.measurement.unit }]
+          : prevLines;
+      return {
+        ...prev,
+        measurement: {
+          ...prev.measurement,
+          quantityMode: mode,
+          lines: nextLines,
+          ...(mode === "detailed" ? recomputeTotal(nextLines) : {}),
+        },
+      };
+    });
+  };
+
+  const addLine = () => {
+    setState((prev) => {
+      const next = [
+        ...(prev.measurement.lines || []),
+        { id: Math.random().toString(), quantity: 1, unit: prev.measurement.unit },
+      ];
+      return {
+        ...prev,
+        measurement: {
+          ...prev.measurement,
+          lines: next,
+          ...recomputeTotal(next),
+        },
+      };
+    });
+  };
+
+  const updateLine = (i: number, partial: Partial<MeasurementLine>) => {
+    setState((prev) => {
+      const next = (prev.measurement.lines || []).map((l, idx) => (idx === i ? { ...l, ...partial } : l));
+      return {
+        ...prev,
+        measurement: {
+          ...prev.measurement,
+          lines: next,
+          ...recomputeTotal(next),
+        },
+      };
+    });
+  };
+
+  const removeLine = (i: number) => {
+    setState((prev) => {
+      const next = (prev.measurement.lines || []).filter((_, idx) => idx !== i);
+      return {
+        ...prev,
+        measurement: {
+          ...prev.measurement,
+          lines: next,
+          ...(next.length > 0 ? recomputeTotal(next) : { quantity: 0 }),
+        },
+      };
+    });
+  };
+
+  const linesSummary = lines
+    .map((l) => `${Number(l.quantity) || 0} ${l.unit}${l.description ? ` (${l.description})` : ""}`)
+    .join(" + ");
+
+  const renderSimpleFields = () => (
+    <>
+      <Field label="Unité de calcul" hint="Sélectionnez l'unité d'analyse par défaut de la rentabilité.">
+        <select
+          value={state.measurement.unit}
+          onChange={(e) => setState((prev) => ({
+            ...prev,
+            measurement: { ...prev.measurement, unit: e.target.value as UnitType }
+          }))}
+          className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/40 text-sm text-slate-100"
+        >
+          {units.map((u) => (
+            <option key={u} value={u}>{u}</option>
+          ))}
+        </select>
+      </Field>
+
+      <Field label="Quantité totale estimée" hint="Entrez la taille du projet à réaliser.">
+        <MinNumberInput
+          value={state.measurement.quantity}
+          min={1}
+          onChange={(v) => setState((prev) => ({
+            ...prev,
+            measurement: { ...prev.measurement, quantity: v }
+          }))}
+          className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/40 text-sm font-mono font-bold text-white"
+        />
+      </Field>
+    </>
+  );
+
+  const renderDetailedFields = () => (
+    <div className="space-y-3">
+      <p className="text-[10px] text-slate-500 leading-relaxed">
+        Décomposez la taille du projet en plusieurs lignes (unités mélangées acceptées). La quantité totale est la somme agrégée des lignes.
+      </p>
+
+      {lines.length === 0 && (
+        <div className="text-[10px] text-slate-500 text-center py-3 border border-dashed border-slate-800 rounded-xl">
+          Aucune ligne de mesure — ajoutez-en une ci-dessous.
+        </div>
+      )}
+
+      {lines.map((line, i) => (
+        <div key={line.id} className="p-3 bg-slate-900/40 border border-slate-800 rounded-xl space-y-2.5">
+          <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_1.6fr_auto] gap-2.5 items-start">
+            <Field label="Quantité">
+              <MinNumberInput
+                value={line.quantity}
+                min={1}
+                onChange={(v) => updateLine(i, { quantity: v })}
+                className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg font-mono text-center text-xs text-white"
+              />
+            </Field>
+            <Field label="Unité">
+              <select
+                value={line.unit}
+                onChange={(e) => updateLine(i, { unit: e.target.value as UnitType })}
+                className="w-full px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white"
+              >
+                {units.map((u) => (
+                  <option key={u} value={u}>{u}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Description (optionnel)">
+              <input
+                type="text"
+                value={line.description || ""}
+                onChange={(e) => updateLine(i, { description: e.target.value })}
+                placeholder="Ex: garage, sous-sol, forfait..."
+                className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white"
+              />
+            </Field>
+            <div className="flex items-end justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => removeLine(i)}
+                aria-label={`Supprimer la ligne ${i + 1}`}
+                className="p-1.5 bg-red-950/20 text-red-400 hover:text-red-300 rounded-lg border border-red-950/30 transition-colors"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      <div className="flex justify-between items-center gap-3 flex-wrap">
+        <button
+          type="button"
+          onClick={addLine}
+          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] uppercase font-bold transition-colors flex items-center gap-1"
+        >
+          <Plus size={13} /> Ajouter une ligne
+        </button>
+
+        {lines.length > 0 && (
+          <div className="text-[10px] text-slate-400 font-mono text-right">
+            Quantité totale : <span className="text-orange-400 font-extrabold">{recomputeTotal(lines).quantity}</span>
+            <span className="block text-[9px] text-slate-500 normal-case font-sans">{linesSummary}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -482,35 +670,49 @@ function StepConfig({ state, setState, trades, objectives, complexities, units }
           </select>
         </Field>
 
-        {/* Unit Type */}
-        <Field label="Unité de calcul" hint="Sélectionnez l'unité d'analyse par défaut de la rentabilité.">
-          <select
-            value={state.measurement.unit}
-            onChange={(e) => setState((prev) => ({
-              ...prev,
-              measurement: { ...prev.measurement, unit: e.target.value as UnitType }
-            }))}
-            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/40 text-sm text-slate-100"
-          >
-            {units.map((u) => (
-              <option key={u} value={u}>{u}</option>
-            ))}
-          </select>
-        </Field>
-
-        {/* Quantity */}
-        <Field label="Quantité totale estimée" hint="Entrez la taille du projet à réaliser.">
-          <input
-            type="number"
-            min="1"
-            value={state.measurement.quantity}
-            onChange={(e) => setState((prev) => ({
-              ...prev,
-              measurement: { ...prev.measurement, quantity: Math.max(1, Number(e.target.value)) }
-            }))}
-            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/40 text-sm font-mono font-bold text-white"
-          />
-        </Field>
+        {/* Unité & Quantité — mode Simple ou Détaillé (standard/pro) */}
+        {state.mode === "quick" ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 col-span-1 md:col-span-2">
+            {renderSimpleFields()}
+          </div>
+        ) : (
+          <div className="col-span-1 md:col-span-2 space-y-4">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="text-[10px] uppercase font-black tracking-wider text-slate-500">
+                Mode de saisie
+              </span>
+              <button
+                type="button"
+                onClick={() => setQuantityMode("simple")}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-colors ${
+                  quantityMode === "simple"
+                    ? "bg-orange-600 text-white"
+                    : "bg-slate-900 text-slate-400 hover:text-white"
+                }`}
+              >
+                Simple
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuantityMode("detailed")}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-colors ${
+                  quantityMode === "detailed"
+                    ? "bg-orange-600 text-white"
+                    : "bg-slate-900 text-slate-400 hover:text-white"
+                }`}
+              >
+                Détaillé
+              </button>
+            </div>
+            {quantityMode === "simple" ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {renderSimpleFields()}
+              </div>
+            ) : (
+              renderDetailedFields()
+            )}
+          </div>
+        )}
 
       </div>
     </div>

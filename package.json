@@ -7,6 +7,8 @@
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
+    "test": "tsx --test tests/*.test.ts",
+    "test:ui": "tsx --test tests/ui/*.test.ts",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
   },
@@ -26,6 +28,7 @@
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
+    "playwright-core": "^1.62.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",

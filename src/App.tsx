@@ -10,6 +10,16 @@ import ProjectForm from "./components/ProjectForm";
 import ResultScreen from "./components/ResultScreen";
 import PrintPDF from "./components/PrintPDF";
 import HuviLogo from "./components/HuviLogo";
+import EmailGateModal from "./components/EmailGateModal";
+import {
+  getStoredEmail,
+  saveEmail,
+  shouldShowGate,
+  shouldShowReask,
+  buildLeadPayload,
+  sendLeadToWebhook,
+  StoredEmail,
+} from "./lib/leadCapture";
 
 // ===== Persistance locale (localStorage, préfixe marges-iq:) =====
 const STORAGE_KEY = "marges-iq:simulations";
@@ -107,8 +117,34 @@ function isEmbedMode(): boolean {
   }
 }
 
+// ===== Lead capture (gate email) =====
+interface GateState {
+  mode: "gate" | "reask";
+  /** Mode à démarrer après validation du gate (null = simple ouverture). */
+  pendingMode: ModeType | null;
+}
+
+/**
+ * Détermine la modale à afficher à l'ouverture :
+ *  - avec ?mode= (démarrage direct, pas de clic) : gate bloquant si aucun email
+ *  - sans mode : AUCUN gate bloquant à l'ouverture (le brief le déclenche au clic
+ *    sur Quick/Standard/Pro) ; seul le reask doux 45 j peut s'afficher
+ */
+function computeInitialGate(): GateState | null {
+  const stored = getStoredEmail();
+  const mode = getInitialMode();
+  if (mode) {
+    if (shouldShowGate(stored)) {
+      return { mode: "gate", pendingMode: mode };
+    }
+    return shouldShowReask(stored) ? { mode: "reask", pendingMode: mode } : null;
+  }
+  return shouldShowReask(stored) ? { mode: "reask", pendingMode: null } : null;
+}
+
 export default function App() {
   const [isEmbed] = useState<boolean>(isEmbedMode);
+  const [gateState, setGateState] = useState<GateState | null>(computeInitialGate);
   const [pastSimulations, setPastSimulations] = useState<SimulationState[]>(loadSimulations);
   const [viewState, setViewState] = useState<"dashboard" | "form" | "result">(() => {
     if (getInitialMode()) return "form";
@@ -149,9 +185,42 @@ export default function App() {
     }
   };
 
-  const handleNewSimulation = (mode: ModeType) => {
+  const startSimulation = (mode: ModeType) => {
     setEditingState(createInitialSimulation(mode));
     setViewState("form");
+  };
+
+  const handleNewSimulation = (mode: ModeType) => {
+    // Gate email bloquant (1re fois) : le mode sélectionné démarre APRÈS validation.
+    const stored = getStoredEmail();
+    if (shouldShowGate(stored)) {
+      setGateState({ mode: "gate", pendingMode: mode });
+      return;
+    }
+    startSimulation(mode);
+  };
+
+  /** Validation du gate bloquant (1re fois) : persiste + envoie le lead + démarre le mode. */
+  const handleGateConfirm = (email: string, consent: boolean) => {
+    const stored = saveEmail(email, consent);
+    void sendLeadToWebhook(buildLeadPayload(email, consent, pastSimulations.length, stored.capturedAt));
+    if (gateState?.pendingMode) {
+      startSimulation(gateState.pendingMode);
+    }
+    setGateState(null);
+  };
+
+  /** [Continuer] du reask 45 jours : met à jour capturedAt + renvoie le lead. */
+  const handleReaskConfirm = (email: string) => {
+    const prev = getStoredEmail();
+    const stored = saveEmail(email, prev?.consent ?? false, Date.now());
+    void sendLeadToWebhook(buildLeadPayload(email, stored.consent, pastSimulations.length, stored.capturedAt));
+    setGateState(null);
+  };
+
+  /** [Plus tard] du reask : ferme, re-tenté à la prochaine ouverture. */
+  const handleReaskDismiss = () => {
+    setGateState(null);
   };
 
   const handleSelectSimulation = (id: string) => {
@@ -300,6 +369,20 @@ export default function App() {
             </a>
           </div>
         </footer>
+      )}
+
+      {/* Lead capture — gate bloquant (1re fois) ou reask doux (45 j) */}
+      {gateState && (
+        <EmailGateModal
+          mode={gateState.mode}
+          initialEmail={getStoredEmail()?.email ?? ""}
+          onConfirm={
+            gateState.mode === "gate"
+              ? (email, consent) => handleGateConfirm(email, consent)
+              : (email) => handleReaskConfirm(email)
+          }
+          onDismiss={gateState.mode === "reask" ? handleReaskDismiss : undefined}
+        />
       )}
 
       {/* Client Proposal PDF printing layout overlay */}

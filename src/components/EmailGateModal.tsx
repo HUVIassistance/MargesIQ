@@ -207,7 +207,7 @@ export default function EmailGateModal({ mode, initialContact = {}, onConfirm, o
                 <span className="text-xs text-slate-300 leading-snug">
                   Rester en contact avec HUVI Optimisation
                   <span className="block text-[11px] text-slate-500 mt-0.5">
-                    Vos données servent uniquement à vous recontacter. Vous pouvez vous retirer en tout temps.
+                    Vos calculs restent sur votre appareil. Votre courriel sert à vous faire parvenir des conseils pour améliorer votre marge.
                   </span>
                 </span>
               </label>

@@ -85,15 +85,18 @@ test("flux lead capture complet (gate enrichi bloquant → validation → reask 
     await emailInput.fill("test@mailinator.com");
     assert.equal(await submitBtn.isDisabled(), true, "domaine jetable doit rester désactivé");
 
-    // Tout valide → active le bouton
+    // Tout valide MAIS consentement non coché → le bouton reste désactivé (Loi 25)
     await firstNameInput.fill("Patricia");
     await lastNameInput.fill("Tremblay");
     await companyInput.fill("Rénovations Tremblay inc.");
     await emailInput.fill("patricia@entreprise.ca");
-    assert.equal(await submitBtn.isDisabled(), false, "tous les champs valides activent le bouton");
+    // Case non pré-cochée (Loi 25 — ne jamais pré-cocher)
+    assert.equal(await page.locator('[data-email-gate="gate"] input[type="checkbox"]').isChecked(), false, "case consentement non pré-cochée");
+    assert.equal(await submitBtn.isDisabled(), true, "4 champs valides mais consent=false : submit bloqué (Loi 25)");
 
-    // Consentement : case non pré-cochée
-    assert.equal(await page.locator('[data-email-gate="gate"] input[type="checkbox"]').isChecked(), false);
+    // Consentement coché → le bouton s'active et le submit passe
+    await page.locator('[data-email-gate="gate"] input[type="checkbox"]').check();
+    assert.equal(await submitBtn.isDisabled(), false, "tous les champs valides + consentement activent le bouton");
 
     await submitBtn.click();
     await page.waitForSelector("#project_form", { timeout: 5000 });
@@ -165,6 +168,8 @@ test("flux lead capture complet (gate enrichi bloquant → validation → reask 
     await page.fill("#gate-last-name", "Gagnon");
     await page.fill("#gate-company", "Toitures Gagnon");
     await page.fill("#email-gate-input", "mode-embed@entreprise.ca");
+    // Consentement obligatoire : cocher avant de soumettre
+    await page.locator('[data-email-gate="gate"] input[type="checkbox"]').check();
     await page.locator('[data-email-gate="gate"] button[type="submit"]').click();
     await page.waitForSelector("#project_form", { timeout: 5000 });
     // Embed : header/footer masqués

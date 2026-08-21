@@ -42,7 +42,9 @@ export default function EmailGateModal({ mode, initialContact = {}, onConfirm, o
   const validLastName = isValidName(lastName);
   const validCompany = isValidName(company);
   const validEmail = isValidEmail(email);
-  const allValid = validFirstName && validLastName && validCompany && validEmail;
+  // Consentement Loi 25 : requis en mode "gate" (case jamais pré-cochée), déjà acquis en mode "reask".
+  const consentValid = mode === "reask" || consent;
+  const allValid = validFirstName && validLastName && validCompany && validEmail && consentValid;
 
   const markTouched = (field: keyof GateContactData) => {
     setTouched((prev) => ({ ...prev, [field]: true }));

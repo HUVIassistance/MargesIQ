@@ -1,0 +1,17 @@
+{
+  "name": "Marges IQ",
+  "short_name": "Marges IQ",
+  "description": "Calculez la marge reelle de vos chantiers, vos couts complets et votre prix de soumission optimal.",
+  "lang": "fr-CA",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A141E",
+  "theme_color": "#0A141E",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
